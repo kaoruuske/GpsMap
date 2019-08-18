@@ -46,7 +46,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
         //코드를 수정합니다.
-        val test = "TEST"
+        val test = "이건 수정?"
+
+
     }
 
 
