@@ -45,7 +45,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         fusedLocationProviderClient = FusedLocationProviderClient(this)
 
 
-
+        //코드를 수정합니다.
+        val test = "TEST"
     }
 
 
