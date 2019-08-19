@@ -2,8 +2,12 @@ package com.example.gpsmap
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -17,13 +21,16 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.PolylineOptions
 import org.jetbrains.anko.alert
 import org.jetbrains.anko.noButton
+import org.jetbrains.anko.toast
 import org.jetbrains.anko.yesButton
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private val REQUEST_ACCESS_FINE_LOCATION = 1000
+    private val polylineOptions = PolylineOptions().width(5f).color(Color.RED)
 
     private lateinit var mMap: GoogleMap
 
@@ -34,7 +41,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        //화면이 꺼지지 않게 하기
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        //세로 모드로 화면 고정
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         setContentView(R.layout.activity_maps)
+
+        //SupportMapFragment를 가져와서 지도가 준비되면 알림을 받습니다.
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -113,6 +127,33 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }.show()
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            REQUEST_ACCESS_FINE_LOCATION -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    //권한 허용됨
+                    addLocationListener()
+                } else {
+                    //권한 거부
+                    toast("권한 거부 됨")
+                }
+
+                return
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        removeLocationListener()
+    }
+
+    private fun removeLocationListener() {
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+    }
+
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
@@ -152,6 +193,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 //14level로 확대하고 현재 위치로 카메라 이동
                 val latLng = LatLng(latitude, longitude)
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+
+                Log.d("MapsActivity", "위도: $latitude, 경도: $longitude")
+
+                //PolyLine에 좌표 추가
+                polylineOptions.add(latLng)
+
+                //선 그리기
+                mMap.addPolyline(polylineOptions)
 
             }
 
