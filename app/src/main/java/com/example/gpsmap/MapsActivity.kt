@@ -1,7 +1,12 @@
 package com.example.gpsmap
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -12,14 +17,19 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import org.jetbrains.anko.alert
+import org.jetbrains.anko.noButton
+import org.jetbrains.anko.yesButton
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
+
+    private val REQUEST_ACCESS_FINE_LOCATION = 1000
 
     private lateinit var mMap: GoogleMap
 
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
-
+    private lateinit var locationCallback: MyLocationCallBack
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,6 +39,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+
+        locationInit()
     }
 
     /**
@@ -41,14 +53,64 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
      * installed Google Play services and returned to the app.
      */
 
-    private fun locationInit(){
+    private fun locationInit() {
         fusedLocationProviderClient = FusedLocationProviderClient(this)
 
 
-        //코드를 수정합니다.
-        val test = "이건 수정?"
+        locationCallback = MyLocationCallBack()
 
+        locationRequest = LocationRequest()
 
+        //GPS우선
+        locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        //업데이트 인터벌
+        //위치 정보가 없을 때는 업데이트 안 함
+        //상화에 따라 짧아질 수 있음, 정확하지 않음
+        //다른 앱에서 짧은 인터벌로 위치 정보를 요청하면 짧아질 수 있음
+        locationRequest.interval = 10000
+        //정화함. 이것보다 짧은 업데이트는 하지 않음
+        locationRequest.fastestInterval = 5000
+
+    }
+
+    private fun permissionCheck(cancel: () -> Unit, ok: () -> Unit) {
+        //위치 권한이 있는 지 검사
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            //권한이 허용되지 않음
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                //이전에 권한을 한 번 거부한 적이 있는 경우에 실행할 함수
+                cancel()
+            } else {
+                //권한 요청
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+                    REQUEST_ACCESS_FINE_LOCATION
+                )
+            }
+        } else {
+            //권한을 수락했을 때 실행할 함수
+            ok()
+        }
+    }
+
+    private fun showPermissionInfoDialog() {
+        alert("현재 위치 정보를 얻으려면 위치 권한이 필요합니다.", "권한이 필요한 이유") {
+            yesButton {
+                //권한 요청
+                ActivityCompat.requestPermissions(
+                    this@MapsActivity,
+                    arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+                    REQUEST_ACCESS_FINE_LOCATION
+                )
+            }
+
+            noButton { }
+        }.show()
     }
 
 
@@ -63,16 +125,37 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        addLocationListener()
+
+        //권한 요청
+        permissionCheck(cancel = {
+            //위치 정보가 필요한 이유 다이얼로그 표시
+            showPermissionInfoDialog()
+        }, ok = {
+            //현재 위치를 주기적으로 요청 (권한이 필요한 부분)
+            addLocationListener()
+        })
+
     }
 
-    private fun addLocationListener(){
-
+    @SuppressLint("MissingPermission")
+    private fun addLocationListener() {
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null)
     }
 
-    inner class MyLocationCallBack : LocationCallback(){
+    inner class MyLocationCallBack : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             super.onLocationResult(locationResult)
+
+            val location = locationResult?.lastLocation
+
+            location?.run {
+                //14level로 확대하고 현재 위치로 카메라 이동
+                val latLng = LatLng(latitude, longitude)
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+
+            }
+
+
         }
     }
 
